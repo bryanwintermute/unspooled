@@ -38,6 +38,8 @@ import importlib
 import sys
 from typing import Callable
 
+__version__ = "0.1.0"
+
 # Each entry maps area name -> (module name, short help).
 AREAS: dict[str, tuple[str, str]] = {
     "base": ("nv_config", "Base tab: cutter, buzzer, font, code page, baud, parity, …"),
@@ -67,6 +69,9 @@ def main(argv: list[str] | None = None) -> int:
     if not argv or argv[0] in ("-h", "--help"):
         _print_top_help()
         return 0
+    if argv[0] in ("-V", "--version"):
+        print(f"unspooled {__version__}")
+        return 0
     area = argv[0]
     if area not in AREAS:
         print(f"error: unknown area {area!r}.", file=sys.stderr)
@@ -87,7 +92,10 @@ def main(argv: list[str] | None = None) -> int:
 def _print_top_help(stream=sys.stdout) -> None:
     print(__doc__.split("\n\n", 1)[0], file=stream)
     print(file=stream)
+    print(f"unspooled {__version__}", file=stream)
+    print(file=stream)
     print("Usage: rongta_config.py <area> [args...]", file=stream)
+    print("       rongta_config.py --version", file=stream)
     print(file=stream)
     print("Areas:", file=stream)
     width = max(len(a) for a in AREAS)

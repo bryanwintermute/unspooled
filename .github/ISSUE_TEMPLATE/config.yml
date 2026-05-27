@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussion / question / design idea
+    url: https://github.com/bryanwintermute/unspooled/discussions
+    about: For anything that isn't a concrete bug report or SKU-compatibility report. (No SLA on responses.)

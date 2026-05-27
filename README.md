@@ -39,6 +39,15 @@ being unspooled into something documented.
   `PrinterTool.exe` config tool (RP325, RP326, RP328 are reported
   to share the protocol family but **untested**; PRs welcome).
 
+> ### ❤️ Help wanted
+>
+> The RP332 has no WiFi or Bluetooth hardware, so PrinterTool.exe's
+> WiFi tab and Bluetooth-setting tab were never reverse-engineered.
+> If you have a Rongta SKU with WiFi or BT and are willing to repeat
+> the technique on it, [open a "Help wanted" issue](https://github.com/bryanwintermute/unspooled/issues/new?template=wifi-bt-help-wanted.yml).
+> Same goes for the UDP-discovery protocol behind the "Search
+> Printer" tab. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Requirements
 
 - Python 3.9+ — **stdlib only, no third-party packages.** That's

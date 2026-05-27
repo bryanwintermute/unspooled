@@ -1,0 +1,87 @@
+name: 🐞 Bug on tested hardware (Rongta RP332)
+description: Something's broken on the SKU this CLI is actually tested against.
+labels: [bug, rp332]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template if you're running on the Rongta **RP332**
+        (the SKU this project was developed against) and something
+        doesn't work as documented. For other Rongta SKUs, please use
+        the "SKU compatibility report" template instead.
+
+  - type: input
+    id: cli-command
+    attributes:
+      label: CLI command you ran
+      description: The exact `rongta_config.py …` invocation, please.
+      placeholder: ./rongta_config.py base --cutter on
+    validations:
+      required: true
+
+  - type: textarea
+    id: dry-run-output
+    attributes:
+      label: `--dry-run` output of the same command
+      description: Re-run with `--dry-run` appended and paste the hex line here.
+      render: text
+      placeholder: |
+        1f 73 02 00 01 01 00 00 00 00 00 1f 72 00 1f 74 00
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: e.g. The self-test should show Cutter:Yes after running this.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened?
+      placeholder: e.g. The self-test still shows Cutter:No. The receipt does not auto-cut.
+    validations:
+      required: true
+
+  - type: textarea
+    id: self-test
+    attributes:
+      label: Self-test report (paper)
+      description: |
+        Print a self-test (hold FEED while powering the printer on, or
+        send `\x12T`) BOTH before and after running the command. Photo
+        or transcribed contents are fine. Include the firmware version
+        line at the top.
+      placeholder: |
+        Before: Cutter:No, Beeper:No, ...
+        After:  Cutter:No, Beeper:No, ...   (no change)
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: 3.11.7
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / distro
+      placeholder: Raspberry Pi OS 12 (bookworm) on a Pi 4
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Heads up
+
+        This is a side-project; there's no SLA on responses. The
+        easier you make it for a maintainer to verify the issue,
+        the faster it'll get triaged. PRs welcome.

@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Opt into Node.js 24 for any actions that still default to 20 internally.
+# (Belt-and-suspenders alongside the @v6 majors below; harmless once everything
+# we depend on is fully on Node 24.)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   pytest:
     runs-on: ubuntu-latest
@@ -14,8 +20,8 @@ jobs:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install pytest (the only dev dependency)

@@ -1,0 +1,85 @@
+name: 🖨️ SKU compatibility report (any Rongta model that isn't RP332)
+description: |
+  You tried this CLI on a different Rongta SKU. Whether it worked or didn't, please report — these reports are the project's only source of cross-SKU compatibility data.
+labels: [sku-compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Read first
+
+        The maintainer can't reproduce non-RP332 issues directly (no
+        other Rongta hardware on hand). Resolution timing is best-
+        effort. PRs that add support for your SKU are the fastest
+        path to a fix — see [`CONTRIBUTING.md`](../CONTRIBUTING.md)
+        for the SKU-addition recipe.
+
+  - type: input
+    id: model
+    attributes:
+      label: Printer model
+      placeholder: e.g. Rongta RP328, RP410, …
+    validations:
+      required: true
+
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Firmware version
+      description: Top line of the self-test report (hold FEED while powering on).
+      placeholder: e.g. V1.21
+    validations:
+      required: true
+
+  - type: input
+    id: usb-id
+    attributes:
+      label: USB VID:PID (from `lsusb`)
+      placeholder: 0fe6:811e
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: Did the CLI work?
+      options:
+        - "Yes — fully (everything I tried just worked)"
+        - "Partially — some commands worked, some didn't"
+        - "No — nothing worked"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-worked
+    attributes:
+      label: What commands did you try, and what was the result?
+      placeholder: |
+        ./rongta_config.py base --cutter on   → worked (self-test shows Cutter:Yes)
+        ./rongta_config.py ethernet dhcp on   → no apparent effect; self-test still shows DHCP:Disabled
+        ./rongta_config.py papersave --delete-top enable → worked
+    validations:
+      required: true
+
+  - type: textarea
+    id: self-test
+    attributes:
+      label: Self-test report contents
+      description: Photo or transcribed text. Helps identify which firmware family your SKU belongs to.
+    validations:
+      required: true
+
+  - type: textarea
+    id: captured-bytes
+    attributes:
+      label: (Optional) Bytes captured from the vendor tool for your SKU
+      description: |
+        If you can reproduce the Wine + logging-CUPS-backend recipe
+        from [`docs/wine-cups-backend-recovers-nv-bytes.md`](../docs/wine-cups-backend-recovers-nv-bytes.md)
+        for your SKU, the captured bytes from running the equivalent
+        commands in the vendor tool would be hugely helpful. They're
+        the difference between guessing-at-fixes and actually knowing.
+      render: text
+      placeholder: |
+        e.g. for the cutter-only Set click on the Base tab on an RP328:
+        1f 73 02 00 01 01 00 00 00 00 00 1f 72 00 1f 74 00

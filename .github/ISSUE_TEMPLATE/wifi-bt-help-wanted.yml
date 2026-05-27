@@ -1,0 +1,65 @@
+name: 📡 Help wanted — WiFi / Bluetooth support
+description: |
+  The RP332 doesn't have WiFi or Bluetooth hardware, so those vendor-tool tabs are unreachable from the maintainer's side. Use this template if you have a Rongta SKU with WiFi/BT AND are willing to help reverse-engineer the bytes.
+labels: [help-wanted, wifi-bt]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Why this template exists
+
+        The maintainer's Rongta RP332 has no WiFi or Bluetooth hardware,
+        so PrinterTool.exe's WiFi tab and Bluetooth-setting tab were
+        skipped in the original reverse-engineering pass. Anyone with
+        an applicable Rongta SKU + willingness to repeat the technique
+        is a hero.
+
+        ## The technique
+
+        See [`docs/wine-cups-backend-recovers-nv-bytes.md`](../docs/wine-cups-backend-recovers-nv-bytes.md)
+        end-to-end. Short version: usbip-export your printer to a Linux
+        host running Wine, install a 20-line custom CUPS backend that
+        tees every print job to disk, click through the WiFi or
+        Bluetooth tab in PrinterTool.exe, diff the captured `.bin`
+        files. Open an issue here with the captured bytes; we'll turn
+        them into a CLI.
+
+  - type: input
+    id: model
+    attributes:
+      label: Printer model with WiFi/BT
+      placeholder: e.g. Rongta RP330W (with WiFi), RP326B (with BT), …
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tabs
+    attributes:
+      label: Which tab(s) do you want to capture?
+      multiple: true
+      options:
+        - "WiFi tab"
+        - "Bluetooth setting tab"
+        - "Search Printer tab (UDP discovery)"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: setup-status
+    attributes:
+      label: Where are you in the RE setup?
+      placeholder: |
+        e.g. "I have Wine + the custom CUPS backend running, just need
+        a hint on which Set button to click first"
+        e.g. "I have captures but can't decode them"
+        e.g. "I'd like to help but haven't started — looking for guidance"
+    validations:
+      required: true
+
+  - type: textarea
+    id: captures
+    attributes:
+      label: Any captures so far?
+      description: Hex dumps of bytes captured from PrinterTool.exe's WiFi/BT tab. Paste raw; readability comes second.
+      render: text

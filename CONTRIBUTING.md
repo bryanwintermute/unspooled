@@ -1,32 +1,57 @@
 # Contributing to unspooled
 
-Thanks for your interest! `unspooled` is a small project but the
-reverse-engineering technique scales naturally to:
+Thanks for your interest! Quick orientation on what's tested,
+what isn't, and what kind of help is most useful.
 
-- **Other Rongta SKUs** that share the `PrinterTool.exe` config tool
-- **Other thermal-receipt vendors** whose Windows tools are similar
-- **More commands within the RP332** (e.g. cutter-stats `BULK-IN`
-  response decoding, the broken Reset button's checksum)
+## Tested vs untested (YMMV)
 
-## What's tested vs untested
-
-- **Tested on:** Rongta RP332 (RP332A revision, USB id `0fe6:811e`,
-  firmware shipping with `PrinterTool.exe` v2.63.0).
-- **Likely works on (untested):** RP325, RP326, RP328, and other
-  Rongta SKUs that share the same vendor config tool. The protocol
-  is the same wire format across the line; only the available
-  settings differ.
+- **Tested on:** Rongta RP332 (RP332A revision, USB id
+  `0fe6:811e`, firmware shipping with `PrinterTool.exe` v2.63.0).
+  This is the only SKU the maintainer has on hand.
+- **Likely works on (untested):** other Rongta SKUs that share
+  the same `PrinterTool.exe` config tool — RP325, RP326, RP328,
+  RP330, RP410, etc. The protocol is the same wire format across
+  the line; only the available settings differ.
 - **Definitely won't work as-is:** non-Rongta thermal printers,
   even ones that accept ESC/POS. The Rongta-vendor commands
-  (`1f 73 …`, `1f 1b 1f …`, `1f 7b …`, `1f 1b 1f a4 …`, etc.) are
-  proprietary extensions, not standard.
+  (`1f 73 …`, `1f 1b 1f …`, `1f 7b …`, etc.) are proprietary
+  extensions, not standard ESC/POS.
 
-The bytes are also **not officially documented anywhere we've
-seen** — Rongta hasn't published a spec, and the vendor mobile
-SDKs ship the relevant methods as stub implementations
-(see `docs/vendor-mobile-sdks-may-stub-nv-config.md`). Treat every
-new model as needing fresh empirical capture, not protocol
+The bytes are **not officially documented anywhere we've seen.**
+Rongta hasn't published a spec, and the vendor mobile SDKs ship
+the relevant methods as stub implementations
+(see `docs/vendor-mobile-sdks-may-stub-nv-config.md`). Treat
+every new model as needing fresh empirical capture, not protocol
 divination.
+
+## Issue + PR policy
+
+This is a side-project. The maintainer's policy is:
+
+- **File an issue if something doesn't work** — there's a
+  template for RP332 bugs and one for other-SKU compatibility
+  reports. They have different SLAs (informally: RP332 bugs
+  best-effort soon, other-SKU reports best-effort whenever).
+- **No SLA on responses** — please don't be surprised if it
+  takes weeks.
+- **PRs are the fastest path to a fix**, especially for SKUs
+  the maintainer can't test directly.
+- **No promises on landing PRs**, but if you read this file and
+  follow it, you're already ~90% of the way there.
+
+## Help especially wanted
+
+The maintainer has **no WiFi/Bluetooth-equipped Rongta hardware
+on hand**, so the corresponding tabs in `PrinterTool.exe` were
+never reverse-engineered. If you have such hardware AND are
+willing to repeat the Wine + logging-CUPS-backend technique on
+it, please open an issue using the "Help wanted — WiFi /
+Bluetooth support" template. The technique is fully documented
+in [`docs/wine-cups-backend-recovers-nv-bytes.md`](docs/wine-cups-backend-recovers-nv-bytes.md);
+the missing piece is just the hardware.
+
+Same goes for the "Search Printer" tab (UDP-broadcast discovery
+protocol).
 
 ## How to add support for a new SKU
 
@@ -53,7 +78,7 @@ divination.
    of the SKU + firmware version. The tests are intentionally
    verbose-by-design — they exist to lock in vendor wire format,
    so the labels should be readable years from now.
-5. **Open a PR** with:
+5. **Open a PR** using the PR template. Include:
    - The new tests
    - A README update naming the newly-supported SKU
    - A note in `docs/` if the SKU has bytes we didn't see on
@@ -89,25 +114,11 @@ writing; it runs in ~0.1s.
 
 If the bytes the CLI sends don't match what your printer expects
 (or, more commonly, "I set X via this CLI and the self-test
-report shows Y"), please file an issue with:
+report shows Y"), use the relevant issue template. The
+information requested by the template is the bare minimum
+needed to even start triaging.
 
-- Printer SKU (run a power-on-self-test by holding FEED while
-  powering on; the report has the model name)
-- Firmware version (top of the self-test report)
-- The exact CLI command you ran
-- The `--dry-run` output of that command
-- The self-test report contents BEFORE and AFTER you ran the
-  command
-- (If possible) the captured bytes from running the *vendor*
-  tool on the same SKU, for the same setting — the easiest way
-  to determine whether we have the wrong bytes or the firmware
-  has different semantics
-
-## Reporting non-protocol bugs
-
-Standard GitHub issue with steps-to-reproduce.
-
-## Out of scope (for now)
+## Out of scope
 
 - **Print-rendering features** beyond `receipt_print.py`. If you
   want fancy layout / barcodes / images, the

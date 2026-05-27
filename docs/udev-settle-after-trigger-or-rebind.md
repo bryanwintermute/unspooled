@@ -1,7 +1,7 @@
 # udev rule looks broken — `ls` ran before `udevadm settle`
 
 **Date learned:** 2026-05-23
-**Context:** Installing a udev rule on the `octoprint` Pi to pin the
+**Context:** Installing a udev rule on the `<printer-host>` Pi to pin the
 Rongta RP332 receipt printer to `/dev/rongta-receipt` and grant the
 `plugdev` group write access, so we don't need `sudo` for every print.
 

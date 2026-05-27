@@ -10,16 +10,16 @@ bytes. A CUPS backend that just `tee`s every job to disk gives you a
 perfect, byte-precise, per-click log file with zero noise — no
 descriptor reads, no control transfers, no decode-from-pcap pain.
 
-## The setup that actually worked (RP332, dev-box, 2026-05)
+## The setup that actually worked (RP332, 2026-05)
 
 ```
-Octoprint (Raspberry Pi, armv7)
+<printer-host>  (Raspberry Pi, ARMv7+)
   ├── Rongta RP332 printer on USB
   ├── usbipd -D                    ← exports the printer over TCP 3240
-  └── usbip bind -b 1-1.3
+  └── usbip bind -b <busid>        ← e.g. 1-1.3
 
-dev-box (Debian 12 QEMU VM, x86_64)
-  ├── modprobe vhci-hcd; usbip attach -r octoprint -b 1-1.3
+<dev-host>      (Debian 12 x86_64; QEMU/Proxmox VM is fine)
+  ├── modprobe vhci-hcd; usbip attach -r <printer-host> -b <busid>
   ├── usblp claims /dev/usb/lp0
   ├── udev rule pins /dev/rongta-receipt symlink, group=plugdev
   ├── CUPS  raw queue 'rongta-raw'  →  custom backend  →  /dev/rongta-receipt
@@ -30,9 +30,9 @@ dev-box (Debian 12 QEMU VM, x86_64)
 
 `PrinterTool.exe` opens its CreateFileW/WriteFile path through Wine's
 winspool → CUPS → the custom backend → printer. usbip-over-LAN means we
-never had to move the cable, and usbmon on the dev-box vhci_hcd bus would
-have worked too, but we never had to use it once the backend logging was
-in place.
+never had to move the cable, and usbmon on `<dev-host>`'s vhci_hcd bus
+would have worked too, but we never had to use it once the backend
+logging was in place.
 
 ## The custom CUPS backend
 
@@ -206,7 +206,7 @@ done
 restoration confirms the byte format you derived (compare what the
 self-test report says before, during, after). Worked example: MAC-Set
 RE — fake `12:34:56:78:9a:bc`, verify self-test shows it, restore
-factory `a8:01:57:3b:ca:60`, verify self-test restored. Both writes
+factory `00:11:22:33:44:55`, verify self-test restored. Both writes
 were exactly `1f 6d <6 bytes>`, confirming the format.
 
 **Watch for firmware echo prints.** The Rongta firmware
@@ -382,8 +382,5 @@ When reverse-engineering a vendor's NV-write protocol:
   we extracted them.
 - [`escpos-thermal-printers-need-no-cups-driver.md`](./escpos-thermal-printers-need-no-cups-driver.md) —
   the parent lesson about driver-free ESC/POS printing.
-- [`safe-replay-tool-pattern.md`](./safe-replay-tool-pattern.md) —
-  for the inverse case where you have full API access and want to
-  mirror state.
 - `nv_config.py` — the working CLI built
   from the bytes recovered here.

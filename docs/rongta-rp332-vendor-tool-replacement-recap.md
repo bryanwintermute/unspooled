@@ -4,7 +4,7 @@ This is the "how to pick this back up" recap for the Rongta RP332
 RE project (May 2026). Pair-read with
 [`wine-cups-backend-recovers-nv-bytes.md`](./wine-cups-backend-recovers-nv-bytes.md),
 which has the deeper technical patterns; this file just maps where
-the artifacts live, what's still hot on dev-box, and what's left.
+the artifacts live, what's still hot on <dev-host>, and what's left.
 
 ## What was built
 
@@ -50,14 +50,24 @@ The other half is Rongta-vendor extensions with no public docs.
 Both halves yielded cleanly to the
 [Wine + logging-CUPS-backend recovery technique](./wine-cups-backend-recovers-nv-bytes.md).
 
-## State of the rig (as of 2026-05-27 morning)
+## State of the rig (the canonical layout to reproduce)
 
-Left intentionally hot so future RE sessions can resume without
-re-bootstrapping. dev-box (10.20.0.139, QEMU Debian 12 VM) is
-running:
+The reverse-engineering rig has two hosts. The values below are
+placeholders; substitute your own.
+
+| Role | Placeholder | Notes |
+|---|---|---|
+| Where the printer is plugged in | `<printer-host>` at `192.0.2.20` | Often a Pi (ARMv7+) that already has the printer attached via USB. Linux. |
+| Where Wine runs | `<dev-host>` at `192.0.2.10` | x86_64 Linux. Wine isn't fun on ARM, so this is a separate host. |
+
+(These IPs are TEST-NET-1, IANA-reserved for documentation. Replace
+with your real LAN values.)
+
+On `<dev-host>`, leave the following running between sessions:
 
 - **Xvfb :99** + **x11vnc on 0.0.0.0:5900** — VNC client connects
-  to `10.20.0.139:5900` (no password).
+  to `<dev-host>:5900` (no password by default; set one with
+  `x11vnc -storepasswd`).
 - **Wine prefix** at `~/wineprefix-rongta` (32-bit, `WINEARCH=win32`).
 - **PrinterTool.exe v2.63.0** in `~/wineprefix-rongta/drive_c/Rongta/`.
   Restart with `cd ~/wineprefix-rongta/drive_c/Rongta && DISPLAY=:99 wine ./RongtaPrinterTool.exe &`.
@@ -66,14 +76,17 @@ running:
   Logs every spool to `/tmp/rongta-writes/<nanosecond>.bin`.
 - **`rongta-raw` CUPS queue** with device URI `rongta:/dev/rongta-receipt`.
 - **udev rule** `/etc/udev/rules.d/99-rongta-receipt.rules` (same as
-  the canonical copy in [``](../../99-rongta-receipt.rules)).
-- **usbipd on octoprint** with the printer bound to busid `1-1.3`.
-- **usbip attach on dev-box** — printer enumerates on Bus 002 as
-  `/dev/usb/lp0` (and is symlinked to `/dev/rongta-receipt`).
-- **`/tmp/rongta-wine/`** — original vendor tool zip + unpacked binaries.
-- **Capture archives:** `/tmp/rongta-writes-archive/day1`,
-  `day2-base-extra`, `/tmp/rongta-writes-eth/`,
-  `/tmp/rongta-writes-other1/` (one labeled `.bin` per RE click).
+  the canonical copy in [`99-rongta-receipt.rules`](../99-rongta-receipt.rules)).
+- **usbipd on `<printer-host>`** with the printer bound (the busid
+  is whatever `usbip list -l` shows on the printer-host side, e.g.
+  `1-1.3`).
+- **usbip attach on `<dev-host>`** — printer enumerates on a virtual
+  USB bus as `/dev/usb/lp0` (and is symlinked to
+  `/dev/rongta-receipt`).
+- **`/tmp/rongta-wine/`** — original vendor tool zip + unpacked
+  binaries.
+- **Capture archives:** `/tmp/rongta-writes-archive/` for past
+  captures, `/tmp/rongta-writes/` for live ones.
 - **PE-tools venv** at `/tmp/petool-venv/` with `pefile` + `capstone`
   bootstrapped via PEP-668 workaround (venv `--without-pip` +
   `get-pip.py`).
@@ -84,11 +97,12 @@ usbip attachments do NOT survive printer power-cycles. When the
 printer reboots:
 
 ```bash
-# octoprint
-sudo usbip bind -b 1-1.3
+# on <printer-host>
+sudo usbip bind -b <busid>            # e.g. 1-1.3
 
-# dev-box
-sudo usbip attach -r 10.20.0.148 -b 1-1.3
+# on <dev-host>
+sudo usbip attach -r <printer-host>   # IP or hostname
+                  -b <busid>
 ```
 
 If `/dev/rongta-receipt` is left behind as a stale **regular file**
@@ -139,11 +153,11 @@ today covers every setting that practically matters.
    FF) might reveal its semantics.
 8. **Pi-side end-to-end smoke test.** Bytes are verified to match
    Wine captures via `--dry-run`, but the per-CLI scripts haven't
-   been run directly on octoprint (always via usbip from dev-box).
+   been run directly on <printer-host> (always via usbip from <dev-host>).
    They should work identically since the device path is the same,
    but a 5-minute sanity check is owed.
-9. **`print-receipt` wrapper on dev-box** — pipe shopping lists
-   from the laptop → ssh → octoprint → `/dev/rongta-receipt`.
+9. **`print-receipt` wrapper on <dev-host>** — pipe shopping lists
+   from the laptop → ssh → <printer-host> → `/dev/rongta-receipt`.
    Deferred from the earliest sessions.
 10. **HTTP / web-share portal** — "send to printer from phone".
     Also deferred from the earliest sessions. The original
@@ -152,7 +166,7 @@ today covers every setting that practically matters.
 ## Cleanup checklist (when you're done with the rig)
 
 ```bash
-# dev-box
+# <dev-host>
 for pid in $(pgrep -f 'x11vnc|RongtaPrinterTool|wineserver|Xvfb :99'); do
   kill "$pid"
 done
@@ -160,7 +174,7 @@ sudo usbip detach -p 0
 # Optional: remove the wineprefix (~50MB) if not keeping for future tabs.
 # rm -rf ~/wineprefix-rongta
 
-# octoprint
+# <printer-host>
 sudo usbip unbind -b 1-1.3
 # usbipd can keep running. Or:
 # sudo systemctl stop usbipd  (if you ever wrap it in a unit)
@@ -170,7 +184,7 @@ sudo usbip unbind -b 1-1.3
 ```
 
 The `rongta-raw` CUPS queue + the custom `/usr/lib/cups/backend/rongta`
-+ the udev rule on dev-box are all harmless when the printer
++ the udev rule on <dev-host> are all harmless when the printer
 isn't attached. Leave them in place if you might revisit.
 
 ## Project numbers

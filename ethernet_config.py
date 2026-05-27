@@ -135,9 +135,9 @@ def main(argv: list[str] | None = None) -> int:
         "static",
         help="Set a static IP (also configures submask + gateway).",
     )
-    sp_static.add_argument("--ip", required=True, help="e.g. 10.20.0.42")
+    sp_static.add_argument("--ip", required=True, help="e.g. 192.0.2.42")
     sp_static.add_argument("--mask", default="255.255.255.0")
-    sp_static.add_argument("--gateway", required=True, help="e.g. 10.20.0.1")
+    sp_static.add_argument("--gateway", required=True, help="e.g. 192.0.2.1")
     sp_static.add_argument(
         "--mode",
         choices=["set", "set2"],
@@ -157,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     sp_mac.add_argument(
         "address",
         help=(
-            "MAC address, e.g. 'a8:01:57:3b:ca:60' or 'a8-01-57-3b-ca-60'. "
+            "MAC address, e.g. '00:11:22:33:44:55' or '00-11-22-33-44-55'. "
             "Note the original before changing — restoring requires knowing it."
         ),
     )

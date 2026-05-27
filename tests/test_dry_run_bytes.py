@@ -161,13 +161,13 @@ ETHERNET_CASES = [
     ),
     (
         "MAC set",
-        ["ethernet", "mac", "a8:01:57:3b:ca:60", "--dry-run"],
-        "1f 6d a8 01 57 3b ca 60",
+        ["ethernet", "mac", "00:11:22:33:44:55", "--dry-run"],
+        "1f 6d 00 11 22 33 44 55",
     ),
     (
         "MAC accepts hyphens",
-        ["ethernet", "mac", "a8-01-57-3b-ca-60", "--dry-run"],
-        "1f 6d a8 01 57 3b ca 60",
+        ["ethernet", "mac", "00-11-22-33-44-55", "--dry-run"],
+        "1f 6d 00 11 22 33 44 55",
     ),
     (
         "duplex defaults (100M full auto)",

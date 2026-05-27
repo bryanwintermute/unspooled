@@ -2,7 +2,7 @@
 
 **Date learned:** 2026-05-23
 **Context:** Wiring up a Rongta RP332 80mm thermal receipt printer
-on the `octoprint` Pi for a to-do / shopping-list printer. The Pi
+on the `<printer-host>` Pi for a to-do / shopping-list printer. The Pi
 inherited a half-installed broken CUPS queue `80Series2` from a prior
 attempt — missing the `rastertort58_80` filter binary, so every CUPS
 job died at the rasterise stage. The instinct was to fix CUPS. The

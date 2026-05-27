@@ -323,6 +323,35 @@ worth a hundred PE-strings reverse-orders. Search query that
 worked for Rongta: `"Rongta" "Linux SDK" filetype:zip` (the SDK
 zip turned up on a partner's CDN, not Rongta's own site).
 
+**And the actual cheapest source of truth, which we found last
+of all:** look at the device's own self-published documentation.
+The RP332's power-on-self-test report contains a complete
+48-entry code-page table — printed on every self-test we ran
+during the entire RE session. Indices 11/12/13/14/33 are
+explicitly marked `RESERVE` (not "missing in our derivation" —
+genuinely reserved slots in the firmware's table). Entry 47
+(`PC874`) wasn't in the PE binary at all and wasn't in the 2017
+SDK — only the firmware knew about it. The receipt was sitting
+on the desk for 48 hours before someone read all the way to the
+bottom of it. Lesson: **before any reverse-engineering, do
+literally everything the device exposes to a user.** Run every
+diagnostic. Print every self-test. Read all the way to the
+bottom. The device may already be telling you what you want to
+know.
+
+Re-ordering of cheapness:
+1. **Read the device's own self-tests / dumps end-to-end.**
+   Free. Usually most authoritative.
+2. **Find the vendor's public SDK.** Often outdated but
+   canonical for what it covers.
+3. **Static-analyse the vendor app's binary.** Fast, but caveat
+   the dropdown-vs-wire-byte issue above.
+4. **Run the vendor app under instrumentation** (logging CUPS
+   backend, usbmon, etc). Slow, but ground truth for what
+   the app actually emits.
+
+The RP332 project did all 4 in *reverse* order. Don't.
+
 ## The pattern, generalised
 
 When reverse-engineering a vendor's NV-write protocol:

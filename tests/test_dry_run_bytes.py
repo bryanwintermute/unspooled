@@ -90,12 +90,22 @@ BASE_CASES = [
         "1f 73 02 00 01 01 00 00 02 00 00 1f 72 00 1f 74 00",
     ),
     (
-        "code-page wcp1252 → byte[8]=10 (verified vs 2017 SDK + self-test)",
+        "code-page wcp1252 → byte[8]=10 (verified vs self-test + 2017 SDK)",
         ["base", "--code-page", "wcp1252", "--dry-run"],
         "1f 73 02 00 01 01 00 00 10 00 00 1f 72 00 1f 74 00",
     ),
     (
-        "code-page-raw 42 (unnamed value, raw passthrough)",
+        "code-page pc874 → byte[8]=2f (only known from self-test, not in dropdown)",
+        ["base", "--code-page", "pc874", "--dry-run"],
+        "1f 73 02 00 01 01 00 00 2f 00 00 1f 72 00 1f 74 00",
+    ),
+    (
+        "code-page wcp1251 → byte[8]=06 (from self-test, sanity-check the gap)",
+        ["base", "--code-page", "wcp1251", "--dry-run"],
+        "1f 73 02 00 01 01 00 00 06 00 00 1f 72 00 1f 74 00",
+    ),
+    (
+        "code-page-raw 42 (=ISO-8859-8 [Hebrew], also tests raw passthrough)",
         ["base", "--code-page-raw", "42", "--dry-run"],
         "1f 73 02 00 01 01 00 00 2a 00 00 1f 72 00 1f 74 00",
     ),

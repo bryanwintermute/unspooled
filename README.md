@@ -148,7 +148,7 @@ echo -e 'milk\neggs\nbread' | ./rongta_config.py print --title 'Costco'
 
 | Area | Module | Coverage |
 |---|---|---|
-| `base` | `nv_config.py` | Cutter, buzzer, drawer kick, font, density, char/line, code page (10 named entries from Rongta's 2017 Linux SDK + `--code-page-raw N` for unnamed values), baud rate, parity, auto-reprint, buzzer-after-print. |
+| `base` | `nv_config.py` | Cutter, buzzer, drawer kick, font, density, char/line, code page (43 named entries, sourced from the printer's own self-test report; 5 reserved slots accessible via `--code-page-raw`), baud rate, parity, auto-reprint, buzzer-after-print. |
 | `ethernet` | `ethernet_config.py` | DHCP, static IP, submask, gateway, MAC address, link mode. |
 | `papersave` | `papersave_config.py` | Whitespace trimming (uses standard Epson `GS ( E`). |
 | `blackmark` | `blackmark_config.py` | Black-mark sensor: enable/disable, length, width, print/cut offset. |
@@ -224,17 +224,20 @@ order), so:
 strings -el -t d PrinterTool.exe | grep -E '^(CP|WCP|ISO|Katakana)' | sort -rn
 ```
 
-…gives you the dropdown labels in their *visual* order. **Heads
-up:** dropdown order is NOT the same as wire-byte order. For the
-RP332's code-page table, the first 6 dropdown entries (CP437,
-Katakana, CP850/860/863/865) happen to match the wire bytes 0-5
-because the most-common pages are listed first AND happen to
-have the lowest enum values — but past that, the dropdown order
-diverges. We later found a 2017 Rongta Linux SDK that names 10
-code pages with their canonical wire values (WCP1252=16, not 12
-as the PE trick suggested). Lesson:
-[`docs/wine-cups-backend-recovers-nv-bytes.md`](docs/wine-cups-backend-recovers-nv-bytes.md)
-has the full debrief.
+…gives you the dropdown labels in their *visual* order.
+**Important:** dropdown order is NOT the same as wire-byte order.
+The RP332's first 6 code-page entries (CP437, Katakana,
+CP850/860/863/865) happen to be wire bytes 0-5 because the
+most-common pages are listed first AND happen to have the lowest
+enum values — but past that, the dropdown order diverges.
+
+**The truly cheap source of truth turned out to be the printer's
+own self-test report**: the RP332's power-on diagnostic prints
+its full 48-entry code-page table verbatim. We just hadn't read
+all the way to the bottom of the receipt. Always read every
+diagnostic output the device exposes before reaching for static
+analysis. Full debrief in
+[`docs/wine-cups-backend-recovers-nv-bytes.md`](docs/wine-cups-backend-recovers-nv-bytes.md).
 
 ## More reading
 

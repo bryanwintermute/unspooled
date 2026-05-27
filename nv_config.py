@@ -31,11 +31,13 @@ encoding, NOT what a sane API would look like):
     c5   Drawer (cash)      0=on, 1=off  (inverted!)
     c6   Char/line          0=48 (Font A) / 64 (Font B),  1=42 / 56
     c7   Density            0=Light, 1=Dark
-    c8   Code page          See CODE_PAGES dict below; ground truth is
-                                Rongta's 2017 Linux SDK ECODEPAGE enum
-                                (e.g. PC437=0, WCP1252=16, CP858=19).
-                                Use --code-page-raw N for values the SDK
-                                doesn't name.
+    c8   Code page          See CODE_PAGES dict below; source of truth is
+                                the printer's power-on self-test report
+                                (which prints its own full code-page
+                                table — 48 entries, 5 RESERVE slots).
+                                Earlier vendor sources (the 2017 Linux
+                                SDK enum, dropdown order in
+                                PrinterTool.exe) are subsets/wrong.
     c9   Parity            0=None, 1=Odd, 2=Even (serial port parity; irrelevant on USB)
     c10  Default font       0=Font A, 1=Font B (narrow), 2=Font C
     c13  Auto Reprint       0=off, 1=on
@@ -85,33 +87,68 @@ BAUD_RATES = {
 }
 
 CODE_PAGES = {
-    # Only verified entries are named here. The source of truth is Rongta's
-    # 2017 Linux SDK (Thermal Printer 80mm/58mm LinuxSDK, ECODEPAGE enum in
-    # RT_LinuxSDK80.h), cross-checked against the printer's actual response:
-    # writing --code-page-raw 16 produces a self-test report showing
-    # 'Page 16 / WCP1252 [Latin I]', confirming SDK numbering on current
-    # firmware too. Earlier versions of this CLI included extra entries
-    # derived from a PE-strings-in-reverse-source-order trick on the
-    # vendor's PrinterTool.exe; that trick happens to give correct values
-    # for indices 0-5 (because those are both the first dropdown entries
-    # AND the lowest wire codes), but the dropdown order diverges from
-    # the wire numbering for everything past index 5. Those guesses were
-    # removed in v0.1.1.
+    # SOURCE OF TRUTH: the printer's power-on-self-test report explicitly
+    # prints its own code-page table. The receipt this was transcribed from
+    # was captured 2026-05-27 on firmware GD307_V1.14 (23-09-20). All 48
+    # entries below are the printer firmware's self-documented mapping;
+    # this overrides every other source (the 2017 Linux SDK, the
+    # PE-strings-in-reverse trick, dropdown order).
     #
-    # For code-page values not named here, use --code-page-raw N. The
-    # printer firmware accepts a wider range than the SDK documents; the
-    # only way to find what name an unnamed value maps to is to write it
-    # and read the self-test.
-    "pc437":    0,   # CP437 [U.S.A., Standard Europe]   — default
-    "katakana": 1,   # Katakana
-    "pc850":    2,   # CP850 [Multilingual]
-    "pc860":    3,   # CP860 [Portuguese]
-    "pc863":    4,   # CP863 [Canadian-French]
-    "pc865":    5,   # CP865 [Nordic]
-    "wcp1252":  16,  # WCP1252 Latin I
-    "wcp1253":  17,  # WCP1253 [Greek]
-    "pc852":    18,  # CP852 [Latin 2]
-    "pc858":    19,  # CP858 Multilingual Latin + Euro
+    # Stylistic note: the firmware self-test prints these labels with
+    # inconsistent "PC" vs "CP" prefixes (e.g. PC437 and PC865 vs CP865,
+    # plus a typo "Cyrilliec" at index 7). We normalize to lowercase
+    # 'pcNNN' CLI names; the comments below reflect what the firmware
+    # actually prints, prefix charm and all.
+    #
+    # Entries marked RESERVE in the self-test (indices 11, 12, 13, 14, 33)
+    # are NOT named here — write --code-page-raw N if you want to test
+    # what the firmware does with them. The remaining 43 entries are
+    # exposed via these stable kebab-case names:
+    "pc437":       0,   # PC437 [Std.Europe]   — default
+    "katakana":    1,   # Katakana
+    "pc850":       2,   # PC850 [Multilingual]
+    "pc860":       3,   # PC860 [Portuguese]
+    "pc863":       4,   # PC863 [Canadian]
+    "pc865":       5,   # CP865 [Nordic]
+    "wcp1251":     6,   # PC1251 [Cyrillic]   (vendor self-test label is "PC1251")
+    "pc866":       7,   # PC866 [Cyrilliec]   (sic — firmware misspells "Cyrillic")
+    "mik":         8,   # MIK [Cyrillic/Bulgarian]
+    "pc755":       9,   # PC755 [EastEurope]
+    "iran":       10,   # Iran
+    # 11, 12, 13, 14: RESERVE — use --code-page-raw if you want to probe
+    "pc862":      15,   # PC862 [Hebrew]
+    "wcp1252":    16,   # PC1252 Latin I
+    "wcp1253":    17,   # PC1253 [Greek]
+    "pc852":      18,   # PC852 [Latina 2]   (sic — "Latina")
+    "pc858":      19,   # PC858 Latin
+    "iran-ii":    20,   # Iran II
+    "latvian":    21,   # Latvian
+    "pc864":      22,   # PC864 [Arabic]
+    "iso-8859-1": 23,   # ISO-8859-1
+    "pc737":      24,   # CP737 [Greek]
+    "wcp1257":    25,   # PC1257 [Baltic]
+    "thai":       26,   # Thai
+    "pc720":      27,   # PC720 [Arabic]
+    "pc855":      28,   # PC855
+    "pc857":      29,   # PC857 [Turkish]
+    "wcp1250":    30,   # PC1250 [Central Eurpoe]   (sic — "Eurpoe")
+    "pc775":      31,   # PC775
+    "wcp1254":    32,   # PC1254 [Turkish]
+    # 33: RESERVE
+    "wcp1256":    34,   # PC1256 [Arabic]
+    "wcp1258":    35,   # PC1258 [Vietnam]
+    "iso-8859-2": 36,   # ISO-8859-2 [Latin 2]
+    "iso-8859-3": 37,   # ISO-8859-3
+    "iso-8859-4": 38,   # ISO-8859-4 [Baltic]
+    "iso-8859-5": 39,   # ISO-8859-5
+    "iso-8859-6": 40,   # ISO-8859-6 [Arabic]
+    "iso-8859-7": 41,   # ISO-8859-7
+    "iso-8859-8": 42,   # ISO-8859-8 [Hebrew]
+    "iso-8859-9": 43,   # ISO-8859-9
+    "iso-8859-15": 44,  # ISO-8859-15 [Latin 3]   (sic — actually West Europe + Euro)
+    "thai2":      45,   # Thai2
+    "pc856":      46,   # PC856
+    "pc874":      47,   # CP874   (not in dropdown OR 2017 SDK — only self-test knows)
 }
 
 DENSITIES = {"light": 0, "dark": 1}

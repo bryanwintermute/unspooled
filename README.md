@@ -1,20 +1,24 @@
 # unspooled
 
-**Stdlib-only Python CLI to configure Rongta RP332 thermal receipt
-printers — replacing the Windows-only vendor tool with seven Python
-scripts and zero third-party dependencies.**
+> A Linux CLI for the Rongta RP332 thermal receipt printer.
+> The protocol was undocumented, the config tool was Windows-only,
+> and the vendor mobile SDKs ship the relevant methods as
+> `mov x0, #0; ret` stubs. So we routed `PrinterTool.exe`'s output
+> through Wine and a custom logging CUPS backend, captured every byte
+> it emits, and re-implemented all of it in **seven Python scripts,
+> stdlib only, zero third-party dependencies**.
 
-The Rongta RP332 (and likely related Rongta SKUs) ships with a
-proprietary Windows-only configuration utility (`PrinterTool.exe`)
-that flips NV-RAM defaults like auto-cutter, buzzer, paper width,
-DHCP, and Chinese-character mode. None of those settings are
-exposed via standard ESC/POS escapes; the bytes are vendor-private
-and absent from Rongta's mobile SDKs (the documented methods are
-stub implementations that return `nil`).
+Every NV-RAM setting the proprietary `PrinterTool.exe` v2.63.0 can
+flip — auto-cutter, buzzer, drawer kick, font, density, paper width,
+DHCP, static IP, MAC address, Chinese character mode, 43 code pages,
+black-mark sensor, paper-save trimming — is now flippable from any
+Linux host with `python3` and the printer attached over USB.
 
 `unspooled` reverse-engineered every command the vendor tool emits
-and re-implements them in seven small Python scripts you can run
-from any Linux host with the printer attached.
+and re-implements them in seven small Python scripts. Hardware on
+hand is a Rongta **RP332**; the protocol family likely also covers
+RP325, RP326, RP328, and other Rongta SKUs that share the
+`PrinterTool.exe` config tool (**untested** — see CONTRIBUTING.md).
 
 ## Why "unspooled"?
 
@@ -37,7 +41,8 @@ being unspooled into something documented.
 
 ## Requirements
 
-- Python 3.9+ (stdlib only, no third-party packages)
+- Python 3.9+ — **stdlib only, no third-party packages.** That's
+  the whole runtime dependency footprint.
 - A Linux host with the printer attached via USB
 - Membership in the `plugdev` group (so you can write to the
   printer without `sudo`)
@@ -67,6 +72,42 @@ after):
 ```bash
 sudo usermod -aG plugdev "$USER"
 ```
+
+## ⚠️ Safety — read this before writing anything
+
+Most commands in this CLI write to the printer's **NV-RAM**. The
+writes are **persistent across power cycles** — there is no
+"undo" beyond writing the previous value back. Wrong values can
+leave the printer in a state where the only recovery path is
+this CLI itself (which is also the project's de-facto factory-reset).
+
+Three concrete failure modes worth knowing before you flip
+anything:
+
+1. **`rongta_config.py other1 usb-mode virtual-serial`** —
+   makes the printer re-enumerate as `/dev/ttyACM*` instead of
+   `/dev/usb/lp0`. The udev rule in this repo won't fire for
+   `ttyACM` devices, so `/dev/rongta-receipt` will not exist.
+   You'll need a different recovery path. Don't run this casually.
+2. **`rongta_config.py ethernet mac <bad-mac>`** — if you change
+   the MAC and forget the original, you can't read it back over
+   USB (the firmware echoes confirmations, but only of the value
+   you sent). Always note the existing MAC from the
+   power-on-self-test report before changing it.
+3. **`rongta_config.py ethernet static --ip <bad-ip>`** — wrong
+   static IP / gateway / subnet can isolate the printer on its
+   own Ethernet but it's harmless if you're driving over USB.
+
+**Always use `--dry-run` first.** Every command supports it.
+Print the bytes, eyeball them, then drop the flag.
+
+```bash
+./rongta_config.py base --cutter on --buzzer on --dry-run
+# 1f 73 02 00 00 01 00 00 00 00 00 1f 72 00 1f 74 00
+```
+
+If you do botch a setting, re-run with the desired values. The
+CLI is its own factory-reset.
 
 ## Quick reference
 
@@ -125,9 +166,9 @@ The other half is Rongta-vendor extensions with no public docs.
 
 ## How we got the bytes
 
-The reverse-engineering technique is fully documented in
+Full technique in
 [`docs/wine-cups-backend-recovers-nv-bytes.md`](docs/wine-cups-backend-recovers-nv-bytes.md).
-TL;DR:
+Short version:
 
 1. **usbip-export the printer** from the Pi it lives on to an
    x86_64 Linux host (so Wine can run on x86 while the printer
@@ -139,13 +180,46 @@ TL;DR:
    that `tee`s every print-spool job to `/tmp/rongta-writes/<ns>.bin`.
 4. **Click through the GUI**: each click = one labelled `.bin`
    file. Diff them to find the bytes that change.
-5. **Static-analyse the PE binary** for big enums: dropdown labels
-   in MFC tools are stored as contiguous string literals in
-   `.rdata` (in **reverse source order** by MSVC), so
-   `strings -el -t d PrinterTool.exe | sort -rn` gives you the
-   dropdown labels in their wire-byte index order. (We mapped all
-   43 code pages this way after a single spot-click confirmed the
-   pattern.)
+
+A concrete example — the Base tab's "Set" command with four
+isolated states (all-off, only-cutter, only-drawer, only-buzzer)
+produces these four 17-byte files. Aligning them column-wise:
+
+```text
+                                  ┌─cutter
+                                  │  ┌─buzzer
+                                  │  │  ┌─drawer
+all-off       :  1f 73 02 |  01  01  01  | 00 00 00 00 00 | 1f 72 00 | 1f 74 00
+cutter-only   :  1f 73 02 |  00  01  01  | 00 00 00 00 00 | 1f 72 00 | 1f 74 00
+drawer-only   :  1f 73 02 |  01  01  00  | 00 00 00 00 00 | 1f 72 00 | 1f 74 00
+buzzer-only   :  1f 73 02 |  01  00  01  | 00 00 00 00 00 | 1f 72 00 | 1f 74 00
+                          └────────────┘
+                          three settings,
+                          inverted booleans
+                          (0 = on, 1 = off)
+```
+
+Position 3 only changes when Cutter is toggled, position 4 only
+when Buzzer, position 5 only when Drawer. The encoding is
+inverted (0 = on, 1 = off) because the factory firmware is shipped
+with everything off and "0" means "default no-add-ons". Four
+clicks → complete bit-mapping in 30 seconds of diffing.
+
+For big enum dropdowns (like the 43 code pages), there's an even
+cheaper trick: **static-analyse the PE binary**. MFC dropdown
+labels are stored as contiguous string literals in the binary's
+`.rdata` section, and MSVC emits them **bottom-up** (reverse
+source order). So:
+
+```bash
+strings -el -t d PrinterTool.exe | grep -E '^(CP|WCP|ISO|Katakana)' | sort -rn
+```
+
+…gives you the dropdown labels in their wire-byte index order.
+We mapped all 43 code pages this way after a single spot-click
+(CP850 = index 2) confirmed the pattern.
+
+## More reading
 
 See [`docs/`](docs/) for the full lesson set:
 
@@ -188,16 +262,8 @@ for the full wishlist.
 
 Apache-2.0. See [`LICENSE`](LICENSE).
 
-## Safety
+## Contributing
 
-Many of the commands in this CLI write to NV-RAM and are
-**persistent across power cycles**. Wrong values can leave the
-printer in an unrecoverable state via USB (e.g., the `usb-mode
-virtual-serial` command makes the printer re-enumerate as
-`/dev/ttyACM*` instead of `/dev/usb/lp0`, breaking the udev rule
-in this repo). Use `--dry-run` to see exactly what bytes will be
-written. Read the docstring of each module before flipping
-anything you don't already understand.
-
-The CLI is its own factory-reset: re-running with known-good
-defaults restores the printer's state.
+PRs welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the
+quick path to adding a new Rongta SKU (or extending the protocol
+catalogue with bytes we haven't captured).

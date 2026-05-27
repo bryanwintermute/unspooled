@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / OS detritus
+.DS_Store
+*.swp
+*~
+
+# Captures from local RE sessions (if you replicate the technique).
+/tmp/rongta-writes/

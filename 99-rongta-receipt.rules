@@ -1,0 +1,4 @@
+# Rongta RP332 thermal receipt printer (USB id 0fe6:811e).
+# Pins the usblp-bound character device to a stable symlink and grants
+# plugdev write access so ESC/POS bytes can be sent without sudo.
+SUBSYSTEM=="usbmisc", KERNEL=="lp[0-9]*", ATTRS{idVendor}=="0fe6", ATTRS{idProduct}=="811e", MODE="0660", GROUP="plugdev", SYMLINK+="rongta-receipt"

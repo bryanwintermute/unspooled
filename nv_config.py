@@ -31,7 +31,11 @@ encoding, NOT what a sane API would look like):
     c5   Drawer (cash)      0=on, 1=off  (inverted!)
     c6   Char/line          0=48 (Font A) / 64 (Font B),  1=42 / 56
     c7   Density            0=Light, 1=Dark
-    c8   Code page          0=PC437,  1=Katakana,  (higher values likely exist)
+    c8   Code page          See CODE_PAGES dict below; ground truth is
+                                Rongta's 2017 Linux SDK ECODEPAGE enum
+                                (e.g. PC437=0, WCP1252=16, CP858=19).
+                                Use --code-page-raw N for values the SDK
+                                doesn't name.
     c9   Parity            0=None, 1=Odd, 2=Even (serial port parity; irrelevant on USB)
     c10  Default font       0=Font A, 1=Font B (narrow), 2=Font C
     c13  Auto Reprint       0=off, 1=on
@@ -81,54 +85,33 @@ BAUD_RATES = {
 }
 
 CODE_PAGES = {
-    # The full table was derived from PrinterTool.exe's UTF-16LE rdata
-    # section: string literals are emitted bottom-up by MSVC, so reading
-    # them in DESCENDING file offset order gives the source order, which
-    # matches the dropdown order, which matches the wire byte. Verified
-    # by spot-check: index 2 (CP850) emitted byte[8]=0x02.
-    "pc437": 0,         # CP437 [U.S.A., Standard Europe]   — default
-    "katakana": 1,      # Katakana
-    "pc850": 2,         # CP850 [Multilingual]
-    "pc860": 3,         # CP860 [Portuguese]
-    "pc863": 4,         # CP863 [Canadian-French]
-    "pc865": 5,         # CP865 [Nordic]
-    "wcp1251": 6,       # WCP1251 [Cyrillic]
-    "pc866": 7,         # CP866 Cyrillic #2
-    "mik": 8,           # MIK [Cyrillic/Bulgarian]
-    "pc755": 9,         # CP755 [East Europe/Latvian 2]
-    "iran": 10,         # Iran
-    "pc862": 11,        # CP862 [Hebrew]
-    "wcp1252": 12,      # WCP1252 Latin I
-    "wcp1253": 13,      # WCP1253 [Greek]
-    "pc852": 14,        # CP852 [Latina 2]
-    "pc858": 15,        # CP858 Multilingual Latin + Euro
-    "iran-ii": 16,      # Iran II
-    "latvian": 17,      # Latvian
-    "pc864": 18,        # CP864 [Arabic]
-    "iso-8859-1": 19,   # ISO-8859-1 [West Europe]
-    "pc737": 20,        # CP737 [Greek]
-    "wcp1257": 21,      # WCP1257 [Baltic]
-    "thai": 22,         # Thai
-    "pc720": 23,        # CP720 [Arabic]
-    "pc855": 24,        # CP855
-    "pc857": 25,        # CP857 [Turkish]
-    "wcp1250": 26,      # WCP1250 [Central Europe]   (sic, mis-spelled "Eurpoe" in tool)
-    "pc775": 27,        # CP775
-    "wcp1254": 28,      # WCP1254 [Turkish]
-    "wcp1255": 29,      # WCP1255 [Hebrew]
-    "wcp1256": 30,      # WCP1256 [Arabic]
-    "wcp1258": 31,      # WCP1258 [Vietnam]
-    "iso-8859-2": 32,   # ISO-8859-2 [Latin 2]
-    "iso-8859-3": 33,   # ISO-8859-3 [Latin 3]
-    "iso-8859-4": 34,   # ISO-8859-4 [Baltic]
-    "iso-8859-5": 35,   # ISO-8859-5 [Cyrillic]
-    "iso-8859-6": 36,   # ISO-8859-6 [Arabic]
-    "iso-8859-7": 37,   # ISO-8859-7 [Greek]
-    "iso-8859-8": 38,   # ISO-8859-8 [Hebrew]
-    "iso-8859-9": 39,   # ISO-8859-9 [Turkish]
-    "iso-8859-15": 40,  # ISO-8859-15 [Latin 3]   (sic — actually 8859-15 is W. Europe + Euro)
-    "thai2": 41,        # Thai2
-    "pc856": 42,        # CP856
+    # Only verified entries are named here. The source of truth is Rongta's
+    # 2017 Linux SDK (Thermal Printer 80mm/58mm LinuxSDK, ECODEPAGE enum in
+    # RT_LinuxSDK80.h), cross-checked against the printer's actual response:
+    # writing --code-page-raw 16 produces a self-test report showing
+    # 'Page 16 / WCP1252 [Latin I]', confirming SDK numbering on current
+    # firmware too. Earlier versions of this CLI included extra entries
+    # derived from a PE-strings-in-reverse-source-order trick on the
+    # vendor's PrinterTool.exe; that trick happens to give correct values
+    # for indices 0-5 (because those are both the first dropdown entries
+    # AND the lowest wire codes), but the dropdown order diverges from
+    # the wire numbering for everything past index 5. Those guesses were
+    # removed in v0.1.1.
+    #
+    # For code-page values not named here, use --code-page-raw N. The
+    # printer firmware accepts a wider range than the SDK documents; the
+    # only way to find what name an unnamed value maps to is to write it
+    # and read the self-test.
+    "pc437":    0,   # CP437 [U.S.A., Standard Europe]   — default
+    "katakana": 1,   # Katakana
+    "pc850":    2,   # CP850 [Multilingual]
+    "pc860":    3,   # CP860 [Portuguese]
+    "pc863":    4,   # CP863 [Canadian-French]
+    "pc865":    5,   # CP865 [Nordic]
+    "wcp1252":  16,  # WCP1252 Latin I
+    "wcp1253":  17,  # WCP1253 [Greek]
+    "pc852":    18,  # CP852 [Latin 2]
+    "pc858":    19,  # CP858 Multilingual Latin + Euro
 }
 
 DENSITIES = {"light": 0, "dark": 1}

@@ -148,7 +148,7 @@ echo -e 'milk\neggs\nbread' | ./rongta_config.py print --title 'Costco'
 
 | Area | Module | Coverage |
 |---|---|---|
-| `base` | `nv_config.py` | Cutter, buzzer, drawer kick, font, density, char/line, **43 code pages**, baud rate, parity, auto-reprint, buzzer-after-print. |
+| `base` | `nv_config.py` | Cutter, buzzer, drawer kick, font, density, char/line, code page (10 named entries from Rongta's 2017 Linux SDK + `--code-page-raw N` for unnamed values), baud rate, parity, auto-reprint, buzzer-after-print. |
 | `ethernet` | `ethernet_config.py` | DHCP, static IP, submask, gateway, MAC address, link mode. |
 | `papersave` | `papersave_config.py` | Whitespace trimming (uses standard Epson `GS ( E`). |
 | `blackmark` | `blackmark_config.py` | Black-mark sensor: enable/disable, length, width, print/cut offset. |
@@ -214,19 +214,27 @@ inverted (0 = on, 1 = off) because the factory firmware is shipped
 with everything off and "0" means "default no-add-ons". Four
 clicks → complete bit-mapping in 30 seconds of diffing.
 
-For big enum dropdowns (like the 43 code pages), there's an even
+For big enum dropdowns (like code pages), there's an even
 cheaper trick: **static-analyse the PE binary**. MFC dropdown
 labels are stored as contiguous string literals in the binary's
-`.rdata` section, and MSVC emits them **bottom-up** (reverse
-source order). So:
+`.rdata` section. MSVC emits them **bottom-up** (reverse source
+order), so:
 
 ```bash
 strings -el -t d PrinterTool.exe | grep -E '^(CP|WCP|ISO|Katakana)' | sort -rn
 ```
 
-…gives you the dropdown labels in their wire-byte index order.
-We mapped all 43 code pages this way after a single spot-click
-(CP850 = index 2) confirmed the pattern.
+…gives you the dropdown labels in their *visual* order. **Heads
+up:** dropdown order is NOT the same as wire-byte order. For the
+RP332's code-page table, the first 6 dropdown entries (CP437,
+Katakana, CP850/860/863/865) happen to match the wire bytes 0-5
+because the most-common pages are listed first AND happen to
+have the lowest enum values — but past that, the dropdown order
+diverges. We later found a 2017 Rongta Linux SDK that names 10
+code pages with their canonical wire values (WCP1252=16, not 12
+as the PE trick suggested). Lesson:
+[`docs/wine-cups-backend-recovers-nv-bytes.md`](docs/wine-cups-backend-recovers-nv-bytes.md)
+has the full debrief.
 
 ## More reading
 

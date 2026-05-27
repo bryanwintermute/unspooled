@@ -269,7 +269,8 @@ protocol; just document that they're broken in this firmware
 version and move on. The CLI you've built (which can write any
 known-good NV state) is itself the factory-reset.
 
-**Static analysis can skip enumeration clicks for big dropdowns.**
+**Static analysis can skip enumeration clicks for big dropdowns —
+but verify more than one entry.**
 The Code Page dropdown on the Rongta tool has 43 entries — clicking
 each one would burn ~22 inches of paper for the firmware-echo
 receipts. Instead, dump the UTF-16LE strings out of the PE's `.rdata`
@@ -277,15 +278,50 @@ section with `strings -el -t d <exe>`, filter for code-page-shaped
 literals, and read them **in descending file offset order**: that
 matches MSVC's bottom-up string-literal emission, which matches
 the C++ source order, which matches the order the tool's
-`AddString()` calls were made, which matches the dropdown order,
-which matches the wire byte. **One spot-click verifies the entire
-table** (we clicked CP850 = expected index 2, observed byte[8]=02 ✓).
+`AddString()` calls were made, which matches the **dropdown order**.
+
+We initially conflated "dropdown order" with "wire byte" because
+ONE spot-click (CP850, index 2 in the dropdown, observed byte[8]=02)
+confirmed the alignment. **That confirmation was an accident of
+sorting.** The dropdown's first 6 entries (CP437, Katakana,
+CP850/860/863/865) are the most commonly-used pages AND happen to
+be wire bytes 0-5, so it's natural for a vendor to list them in
+that order. After CP865, the dropdown order has nothing to do
+with the wire bytes — we found this out when a buried 2017
+Rongta Linux SDK (`Thermal Printer 80mm And 58mm LinuxSDK.zip`)
+turned up with a public `ECODEPAGE` enum:
+
+    CP437=0, Katakana=1, CP850=2, CP860=3, CP863=4, CP865=5,
+    WCP1252=16, WCP1253=17, CP852=18, CP858=19
+
+A confirming write of `--code-page-raw 16` on current 2025 firmware
+printed `Page 16 / WCP1252 [Latin I]` on the self-test — the SDK is
+ground truth, the PE-strings trick was right for the first 6
+entries and wrong for everything past that.
+
+**The discipline:** when using static analysis of an enum-like data
+structure to infer wire values, **spot-check at least one entry
+from EACH side of the structure**. If you'd only verified one
+deep-index entry (say index 15 = WCP1252 per my wrong table)
+you'd have caught the bug instantly. Confirming only one
+low-index entry validates only that values 0-N for some small N
+are correct — it doesn't validate the rest.
 
 Anti-pattern caveat: this only works for dropdowns whose backing
 storage is a contiguous block of string literals. Dropdowns
 populated dynamically (from registry, a config file, or runtime
 discovery) need actual clicks. If you can see the strings in
-`strings -el`, you can probably read off the indices.
+`strings -el`, you can probably read off the dropdown order —
+but you still need empirical clicks to map dropdown order to
+wire byte.
+
+**Also:** if the vendor has a public SDK at all, look for it
+first. Even if it's outdated, even if it only covers a subset
+of the protocol, even if it's hidden three levels deep on the
+vendor's download page. A canonical enum from the vendor is
+worth a hundred PE-strings reverse-orders. Search query that
+worked for Rongta: `"Rongta" "Linux SDK" filetype:zip` (the SDK
+zip turned up on a partner's CDN, not Rongta's own site).
 
 ## The pattern, generalised
 

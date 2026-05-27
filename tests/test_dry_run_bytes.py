@@ -90,7 +90,12 @@ BASE_CASES = [
         "1f 73 02 00 01 01 00 00 02 00 00 1f 72 00 1f 74 00",
     ),
     (
-        "code-page-raw 42 (pc856, last enum entry)",
+        "code-page wcp1252 → byte[8]=10 (verified vs 2017 SDK + self-test)",
+        ["base", "--code-page", "wcp1252", "--dry-run"],
+        "1f 73 02 00 01 01 00 00 10 00 00 1f 72 00 1f 74 00",
+    ),
+    (
+        "code-page-raw 42 (unnamed value, raw passthrough)",
         ["base", "--code-page-raw", "42", "--dry-run"],
         "1f 73 02 00 01 01 00 00 2a 00 00 1f 72 00 1f 74 00",
     ),

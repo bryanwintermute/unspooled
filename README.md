@@ -8,17 +8,30 @@
 > it emits, and re-implemented all of it in **seven Python scripts,
 > stdlib only, zero third-party dependencies**.
 
-Every NV-RAM setting the proprietary `PrinterTool.exe` v2.63.0 can
-flip — auto-cutter, buzzer, drawer kick, font, density, paper width,
-DHCP, static IP, MAC address, Chinese character mode, 43 code pages,
-black-mark sensor, paper-save trimming — is now flippable from any
-Linux host with `python3` and the printer attached over USB.
+`unspooled` is two things in one repo:
 
-`unspooled` reverse-engineered every command the vendor tool emits
-and re-implements them in seven small Python scripts. Hardware on
-hand is a Rongta **RP332**; the protocol family likely also covers
-RP325, RP326, RP328, and other Rongta SKUs that share the
-`PrinterTool.exe` config tool (**untested** — see CONTRIBUTING.md).
+1. **A generic stdlib ESC/POS renderer** (`receipt_print.py`) — works
+   on any ESC/POS-compatible 80mm or 58mm thermal receipt printer
+   (Rongta, Epson, Star, Bixolon, Xprinter, …). Use as a CLI or
+   import as a library:
+   ```python
+   from receipt_print import Receipt
+   r = Receipt(title="Costco", style="checkbox", print_width=42)
+   r.add_items(["milk", "eggs", "bread"])
+   open("/dev/usb/lp0", "wb").write(r.to_bytes())
+   ```
+2. **A Rongta RP332 NV-config CLI** (`nv_config.py`, `ethernet_config.py`,
+   `papersave_config.py`, `blackmark_config.py`, `other1_config.py`,
+   all dispatched through `rongta_config.py`) — flips the persistent
+   factory defaults (auto-cutter, buzzer, drawer kick, paper width,
+   DHCP, static IP, MAC, 43 code pages, black-mark sensor, paper-save
+   trimming, …) without needing the proprietary Windows tool.
+
+The renderer is **brand-agnostic** by design and is the bit you want
+if you're building anything that prints to a thermal receipt
+printer. The Rongta CLIs are **brand-specific** by necessity — the
+NV-config wire protocol is proprietary to Rongta. Use whichever half
+applies.
 
 ## Why "unspooled"?
 
@@ -31,13 +44,14 @@ being unspooled into something documented.
 
 ## Hardware
 
-- **Printer:** Rongta RP332, 80mm thermal, auto-cut, USB+Serial+Ethernet.
-- **USB id:** `0fe6:811e` (the printer presents as an ICS Advent
-  Parallel Adapter — Rongta licenses the USB-to-parallel chip from
-  ICS Advent).
-- **Likely also works on:** other Rongta SKUs that share the
-  `PrinterTool.exe` config tool (RP325, RP326, RP328 are reported
-  to share the protocol family but **untested**; PRs welcome).
+- **Renderer (`receipt_print.py`):** Any ESC/POS-compatible thermal
+  receipt printer (80mm or 58mm head). No vendor lock-in.
+- **NV-config CLIs (`rongta_config.py` et al.):** Rongta RP332,
+  USB id `0fe6:811e` (the printer presents as an "ICS Advent
+  Parallel Adapter" — Rongta licenses the USB-to-parallel chip).
+  **Likely** also works on other Rongta SKUs that share the
+  `PrinterTool.exe` config tool (RP325, RP326, RP328, etc.) but
+  **untested** — PRs welcome.
 
 > ### ❤️ Help wanted
 >
@@ -153,7 +167,47 @@ echo -e 'milk\neggs\nbread' | ./rongta_config.py print --title 'Costco'
 | `papersave` | `papersave_config.py` | Whitespace trimming (uses standard Epson `GS ( E`). |
 | `blackmark` | `blackmark_config.py` | Black-mark sensor: enable/disable, length, width, print/cut offset. |
 | `other1` | `other1_config.py` | Paper width (80mm/58mm), buzzer volume, alarm, USB enumeration mode, Chinese character mode, cutter-count query. |
-| `print` | `receipt_print.py` | Render a list (with `--title`, `--style`, etc.) as ESC/POS. |
+| `print` | `receipt_print.py` | Render a list (with `--title`, `--style`, `--print-width`) as standard Epson ESC/POS. Brand-agnostic. |
+
+## Use as a library (`receipt_print.py`)
+
+`receipt_print.py` is intentionally importable from downstream
+projects (e.g. [`tickertape`](https://github.com/bryanwintermute/tickertape))
+without dragging in any of the Rongta-specific modules. It's
+stdlib-only, brand-agnostic, and the entire byte-emitting surface
+is standard Epson ESC/POS (init, code-page CP437, align, font size,
+bold, full-cut).
+
+```python
+from receipt_print import Receipt
+
+# 80mm head, Font A (the default — 42 columns).
+r = Receipt(title="Costco", style="checkbox")
+r.add_items(["milk", "eggs", "bread"])
+with open("/dev/usb/lp0", "wb") as f:
+    f.write(r.to_bytes())
+
+# 58mm head — pass print_width=32.
+r58 = Receipt(title="Reminders", style="bullet", print_width=32)
+r58.add_items(["pick up package", "water plants"])
+```
+
+Constructor signature:
+
+```python
+Receipt(
+    title: str | None = None,        # optional bold/centered/upper-cased title
+    timestamp: bool = True,          # adds a YYYY-MM-DD HH:MM line under the title
+    items: list[str] = [],           # or use .add_item() / .add_items()
+    style: str = "checkbox",         # 'checkbox' / 'numbered' / 'bullet' / 'plain'
+    cut: bool = True,                # GS V 0 full-cut at the end
+    print_width: int = 42,           # 42=80mm Font A, 32=58mm Font A, 56=80mm Font B
+)
+```
+
+The `Receipt.to_bytes()` method is deterministic given the same
+inputs (timestamp aside) and the byte format is locked by the test
+suite in `tests/test_receipt_print_library.py`.
 
 ## Command-family catalogue
 

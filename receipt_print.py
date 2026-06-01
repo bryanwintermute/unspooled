@@ -1,18 +1,32 @@
 #!/usr/bin/env python3
-"""Receipt-printer renderer + CLI for the Rongta RP332.
+"""Stdlib-only ESC/POS renderer for 80mm and 58mm thermal receipt printers.
 
-Stdlib-only ESC/POS renderer designed to be:
-- usable as a CLI on the printer host: `receipt-print --title 'Costco' < items.txt`
-- importable from a future HTTP service: `from receipt_print import Receipt`
+Designed to be:
+- usable as a CLI: `python3 receipt_print.py --title 'Costco' < items.txt`
+- importable as a library: `from receipt_print import Receipt`
 
-The Rongta RP332 (USB id 0fe6:811e) is bound to /dev/usb/lp0 by the
-generic usblp kernel driver and pinned to /dev/rongta-receipt by the
-udev rule in ./99-rongta-receipt.rules. The printer accepts raw
-ESC/POS byte streams; no CUPS, no vendor "driver", no Python deps.
+The emitted byte stream is standard Epson ESC/POS (init, code-page-CP437,
+align, font size, bold, full-cut) and should work on any ESC/POS-compatible
+thermal receipt printer — Rongta RP332, Epson TM-T88, Star TSP100, Bixolon
+SRP-330, Xprinter XP-58 family, and so on. The CLI defaults to writing to
+`/dev/usb/lp0` (the kernel's generic `usblp` character device); pass
+`--device` for any other path, or pipe the bytes anywhere via `--dry-run`.
+
+For Rongta RP332 specifically, install the udev rule shipped alongside this
+module (`99-rongta-receipt.rules`) and use `--device /dev/rongta-receipt`.
+For other printers, your distro / udev rule conventions apply.
+
+Width / column constants:
+- 80mm head + Font A (12x24)  → 42 columns
+- 80mm head + Font B (9x17)   → 56 columns
+- 58mm head + Font A          → 32 columns
+- 58mm head + Font B          → 42 columns
+The renderer defaults to 42-col / 80mm Font A. Pass `print_width=` to
+`Receipt()` for 58mm or other widths.
 
 References for the command set used here:
   https://escpos.readthedocs.io/en/latest/  (community spec)
-  Epson TM-T88 programming reference (RP332 is ESC/POS-compatible)
+  Epson TM-T88 programming reference
 """
 
 from __future__ import annotations
@@ -24,11 +38,14 @@ import time
 from dataclasses import dataclass, field
 from typing import Iterable
 
-DEFAULT_DEVICE = "/dev/rongta-receipt"
+# Generic kernel-bound usblp char device. The Rongta-specific symlink
+# `/dev/rongta-receipt` (from the bundled udev rule) is equivalent on
+# Bryan's rig but isn't required — change `--device` for any other path.
+DEFAULT_DEVICE = "/dev/usb/lp0"
 
-# Printable width at the standard (Font A, 12x24) font on an 80mm head.
-# Font A is 42 cols. Font B (9x17) is 56 cols. We stick to Font A.
-PRINT_COLS = 42
+# Default print width: 80mm head, Font A (12x24 dots). Override per-Receipt
+# via the print_width= keyword for 58mm heads (=32), Font B (=56), etc.
+DEFAULT_PRINT_WIDTH = 42
 
 ESC = b"\x1b"
 GS = b"\x1d"
@@ -63,13 +80,22 @@ def _encode(s: str) -> bytes:
 
 @dataclass
 class Receipt:
-    """A renderable receipt. Build with .add_*() then .to_bytes()."""
+    """A renderable receipt. Build with .add_*() then .to_bytes().
+
+    print_width is the column count for textwrap + horizontal-rule
+    rendering. Defaults to 42 (80mm head, Font A). Use 32 for 58mm,
+    56 for 80mm Font B, etc. The renderer does NOT switch the printer's
+    font for you; if you want Font B output you need to set the NV
+    default-font (see ../unspooled rongta_config base --font b) AND
+    pass print_width=56.
+    """
 
     title: str | None = None
     timestamp: bool = True
     items: list[str] = field(default_factory=list)
     style: str = "checkbox"
     cut: bool = True
+    print_width: int = DEFAULT_PRINT_WIDTH
 
     def add_item(self, text: str) -> None:
         self.items.append(text)
@@ -89,7 +115,7 @@ class Receipt:
 
         wrapped = textwrap.fill(
             text,
-            width=PRINT_COLS,
+            width=self.print_width,
             initial_indent=prefix,
             subsequent_indent=cont_indent,
             break_long_words=True,
@@ -111,13 +137,13 @@ class Receipt:
             out += ALIGN_CENTER + _encode(ts) + b"\n" + ALIGN_LEFT
 
         if self.title or self.timestamp:
-            out += _encode("-" * PRINT_COLS) + b"\n"
+            out += _encode("-" * self.print_width) + b"\n"
 
         for i, item in enumerate(self.items):
             out += self._render_item(i, item)
 
         if self.items:
-            out += _encode("-" * PRINT_COLS) + b"\n"
+            out += _encode("-" * self.print_width) + b"\n"
 
         # Advance paper above the tear/cutter bar (~12mm) then cut.
         out += LF * 5
@@ -129,7 +155,11 @@ class Receipt:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
-        description="Render a list to the Rongta RP332 thermal printer.",
+        description=(
+            "Render a list to a thermal receipt printer as Epson ESC/POS. "
+            "Works on any ESC/POS-compatible printer; defaults assume 80mm "
+            "head + Font A. Pass --print-width 32 for 58mm."
+        ),
     )
     p.add_argument(
         "file",
@@ -148,6 +178,16 @@ def main(argv: list[str] | None = None) -> int:
         "--device",
         default=DEFAULT_DEVICE,
         help=f"Printer device (default: {DEFAULT_DEVICE}).",
+    )
+    p.add_argument(
+        "--print-width",
+        type=int,
+        default=DEFAULT_PRINT_WIDTH,
+        help=(
+            f"Column count for text wrap + horizontal rules "
+            f"(default: {DEFAULT_PRINT_WIDTH} = 80mm Font A; "
+            "use 32 for 58mm)."
+        ),
     )
     p.add_argument("--no-timestamp", action="store_true", help="Suppress timestamp line.")
     p.add_argument("--no-cut", action="store_true", help="Skip the auto-cut at the end.")
@@ -169,6 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         timestamp=not args.no_timestamp,
         style=args.style,
         cut=not args.no_cut,
+        print_width=args.print_width,
     )
     receipt.add_items(lines)
 

@@ -144,11 +144,50 @@ def test_sanitize_strips_accents_via_nfkd():
     assert sanitize("r\u00F6le") == "role"
 
 def test_sanitize_translates_fractions():
-    """Sanitizer translates unicode fractions into ASCII equivalents."""
+    """Sanitizer translates Latin-1 unicode fractions into ASCII equivalents."""
     from receipt_print import sanitize
-    assert sanitize("1\u00BC cups") == "1 1/4 cups"
+    # Standalone fractions (no leading digit) → ASCII forms.
+    assert sanitize("\u00BC cup") == "1/4 cup"
     assert sanitize("\u00BD off") == "1/2 off"
     assert sanitize("\u00BE inch") == "3/4 inch"
+
+
+def test_sanitize_inserts_space_for_mixed_numbers():
+    """Mixed-number convention: `1\u00BC` should render as `1 1/4`, not `11/4`.
+
+    Without the digit-fraction spacing pass, the recipe-style
+    `"1\u00BC cups"` (one and a quarter cups) would silently degrade
+    to `"11/4 cups"` — visually eleven-quarters, semantically wrong.
+    """
+    from receipt_print import sanitize
+    assert sanitize("1\u00BC cups") == "1 1/4 cups"
+    assert sanitize("2\u00BD tsp") == "2 1/2 tsp"
+    assert sanitize("3\u00BE lb") == "3 3/4 lb"
+    # Multi-digit prefix also works.
+    assert sanitize("10\u00BD oz") == "10 1/2 oz"
+
+
+def test_sanitize_number_forms_block_also_supported():
+    """The spacing regex covers the whole \u2150-\u215E Number Forms block.
+
+    These chars aren't in DEFAULT_SANITIZE_MAP yet (which only lists
+    \u00BC-\u00BE), so the *translation* is whatever NFKD decomposes
+    them to. But the *spacing* pass still fires, which is what we're
+    asserting here — the regex stays valid as the map is extended.
+    """
+    from receipt_print import sanitize
+    # \u2153 = ⅓. NFKD decomposes to "1\u20444" (digit + fraction-slash + digit).
+    # The spacing regex inserts a space before it; the leading digit gets
+    # the separator regardless of whether \u2153 itself is mapped.
+    result = sanitize("1\u2153 cups")
+    assert result.startswith("1 "), f"expected leading-digit space, got {result!r}"
+
+
+def test_sanitize_does_not_insert_space_for_non_fraction_chars():
+    """`5\u00D7` (5 + multiplication-sign) → `5x`, no space inserted."""
+    from receipt_print import sanitize
+    assert sanitize("5\u00D73") == "5x3"
+    assert sanitize("5\u21923") == "5->3"
 
 
 def test_default_sanitize_map_is_extendable_via_constant_import():

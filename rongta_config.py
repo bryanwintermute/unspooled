@@ -38,7 +38,7 @@ import importlib
 import sys
 from typing import Callable
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Each entry maps area name -> (module name, short help).
 AREAS: dict[str, tuple[str, str]] = {

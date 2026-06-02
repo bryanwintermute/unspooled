@@ -202,12 +202,89 @@ Receipt(
     style: str = "checkbox",         # 'checkbox' / 'numbered' / 'bullet' / 'plain'
     cut: bool = True,                # GS V 0 full-cut at the end
     print_width: int = 42,           # 42=80mm Font A, 32=58mm Font A, 56=80mm Font B
+    sanitize: bool | dict | callable = True,  # see "Text sanitization" below
 )
 ```
 
 The `Receipt.to_bytes()` method is deterministic given the same
 inputs (timestamp aside) and the byte format is locked by the test
 suite in `tests/test_receipt_print_library.py`.
+
+### Render Markdown directly
+
+Real-world text (notes apps, web pastes, generated to-do lists)
+is usually markdown-ish. `render_markdown()` parses a constrained
+CommonMark subset and emits ESC/POS bytes — no third-party markdown
+library needed.
+
+```python
+from receipt_print import render_markdown
+
+md = """# Shopping List
+
+Generated for **Saturday**.
+
+- [ ] milk
+- [ ] eggs
+- [x] bread (already bought)
+
+## Notes
+
+Store closes at 8pm.
+
+---
+"""
+bytes_out = render_markdown(md, title="Costco", print_width=42)
+open("/dev/usb/lp0", "wb").write(bytes_out)
+```
+
+Supported subset (stdlib regex tokenizer — see `tests/test_markdown.py`
+for the full grammar):
+
+| Markdown | ESC/POS rendering |
+|---|---|
+| `# H1` | double-size + bold + center |
+| `## H2` | bold + center |
+| `### H3` | bold + left-aligned |
+| `**bold**` (inline) | bold span |
+| `- item` / `* item` | bullet list |
+| `1. item` (literal numbers) | numbered list |
+| `- [ ] item` / `- [x] item` | checkbox (state preserved) |
+| `---` / `***` / `___` | horizontal rule across `print_width` |
+| paragraph | wrapped to `print_width`, consecutive lines fold |
+
+`Receipt.from_markdown(text, **kwargs)` is also available as a
+classmethod for API symmetry; it's a thin wrapper around
+`render_markdown()` and returns bytes directly.
+
+Deliberately out of scope (v1): tables, code blocks, images, links
+(the printer can't follow them), nested lists, blockquotes.
+
+### Text sanitization
+
+By default (since v0.3.0), text passes through a NFKD + smart-quote /
+em-dash / ellipsis / arrow translation pass before CP437 encoding.
+This means clipboard pastes from web pages no longer silently render
+as `?` glyphs.
+
+```python
+# Smart quotes -> straight, em-dash -> --, ellipsis -> ..., café -> cafe.
+r = Receipt(items=['He said "hello"—then left…'])
+
+# Opt out for v0.2.0 behavior (raw CP437 errors='replace'):
+r = Receipt(items=['raw\u00B5'], sanitize=False)
+
+# Extend the built-in map:
+r = Receipt(items=['10 \u00B5s'], sanitize={"\u00B5": "u"})  # -> "10 us"
+
+# Or pass a full custom callable:
+r = Receipt(items=['hello'], sanitize=lambda s: s.upper())  # -> "HELLO"
+```
+
+The built-in translation table is exposed as
+`DEFAULT_SANITIZE_MAP` for inspection or extension. The
+`sanitize()` function itself is also importable if you want to
+preprocess text outside the `Receipt` / `render_markdown` API.
 
 ## Command-family catalogue
 

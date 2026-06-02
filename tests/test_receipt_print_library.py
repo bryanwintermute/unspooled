@@ -77,13 +77,100 @@ def test_print_width_kwarg_affects_textwrap():
         assert len(line) <= 20, f"line too long: {line!r}"
 
 
-def test_cp437_fallback_for_unsupported_chars():
-    """Smart quotes / em-dashes should encode to ? (not crash)."""
+def test_default_sanitizer_translates_smart_quotes_and_em_dashes():
+    """Default sanitize=True turns smart-quotes / em-dashes into ASCII.
+
+    This is a behavior CHANGE from v0.2.0 (which silently `?`-replaced
+    them at CP437 encode time). The new default matches what callers
+    almost always actually want; opt-out with sanitize=False to get
+    the old behavior.
+    """
     r = Receipt(timestamp=False)
     r.add_items(["smart \u201cquotes\u201d and em\u2014dashes"])
     out = r.to_bytes()
-    # CP437 errors='replace' produces '?' for unknown chars.
+    assert b'"quotes"' in out
+    assert b"em--dashes" in out
+    assert b"?" not in out
+
+
+def test_sanitize_false_preserves_v020_silent_question_mark_replacement():
+    """Opt-out path: sanitize=False reproduces v0.2.0 CP437 fallback.
+
+    This is the byte-equality contract for downstream consumers that
+    already do their own preprocessing and want raw v0.2.0 behavior.
+    """
+    r = Receipt(timestamp=False, sanitize=False)
+    r.add_items(["smart \u201cquotes\u201d and em\u2014dashes"])
+    out = r.to_bytes()
     assert b"?" in out
+
+
+def test_sanitize_dict_extends_default_map():
+    r = Receipt(timestamp=False, sanitize={"\u00B5": "u"})  # micro-sign
+    r.add_items(["10 \u00B5s"])
+    out = r.to_bytes()
+    assert b"10 us" in out
+    # Defaults still apply on top:
+    r2 = Receipt(timestamp=False, sanitize={"\u00B5": "u"})
+    r2.add_items(["\u201Chi\u201D"])
+    assert b'"hi"' in r2.to_bytes()
+
+
+def test_sanitize_callable_replaces_default_pipeline():
+    r = Receipt(timestamp=False, sanitize=lambda s: s.upper())
+    r.add_items(["hello"])
+    assert b"HELLO" in r.to_bytes()
+
+
+def test_sanitize_invalid_type_raises():
+    with pytest.raises(TypeError):
+        Receipt(timestamp=False, sanitize=42)
+
+
+def test_sanitize_is_idempotent():
+    """sanitize(sanitize(x)) == sanitize(x) — no double-translation drift."""
+    from receipt_print import sanitize
+    s = "smart \u201cquotes\u201d, em\u2014dash, ellipsis\u2026, arrow\u2192, caf\u00E9"
+    once = sanitize(s)
+    twice = sanitize(once)
+    assert once == twice
+
+
+def test_sanitize_strips_accents_via_nfkd():
+    """`caf\u00E9` (e + acute as one char) → `cafe` via NFKD + combining-mark drop."""
+    from receipt_print import sanitize
+    assert sanitize("caf\u00E9") == "cafe"
+    assert sanitize("na\u00EFve") == "naive"
+    assert sanitize("r\u00F6le") == "role"
+
+
+def test_default_sanitize_map_is_extendable_via_constant_import():
+    """Consumers should be able to import + read DEFAULT_SANITIZE_MAP."""
+    from receipt_print import DEFAULT_SANITIZE_MAP
+    assert "\u2014" in DEFAULT_SANITIZE_MAP  # em-dash
+    assert DEFAULT_SANITIZE_MAP["\u2014"] == "--"
+    assert "\u2192" in DEFAULT_SANITIZE_MAP  # arrow
+    assert DEFAULT_SANITIZE_MAP["\u2192"] == "->"
+
+
+def test_sanitize_preserves_ascii_unchanged():
+    """Pure ASCII input must round-trip unchanged through the sanitizer."""
+    from receipt_print import sanitize
+    s = "milk\neggs\nbread [ ] 1. - hello world!"
+    assert sanitize(s) == s
+
+
+def test_ascii_only_input_is_byte_identical_with_and_without_sanitize():
+    """v0.2.0 byte-equality contract: pure ASCII input emits identical
+    bytes whether sanitize=True (new default) or sanitize=False (v0.2.0
+    behavior). Anything else is a regression for downstream callers
+    pinning to a fixture."""
+    r_new = Receipt(timestamp=False, sanitize=True)
+    r_old = Receipt(timestamp=False, sanitize=False)
+    items = ["milk", "eggs", "bread"]
+    r_new.add_items(items)
+    r_old.add_items(items)
+    assert r_new.to_bytes() == r_old.to_bytes()
 
 
 def test_checkbox_style_emits_brackets():

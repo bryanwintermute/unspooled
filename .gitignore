@@ -8,6 +8,9 @@ __pycache__/
 # Editor / OS detritus
 .DS_Store
 *.swp
+
+# Copilot CLI session transcripts (auto-generated locally; not source).
+copilot-session-*.md
 *~
 
 # Captures from local RE sessions (if you replicate the technique).

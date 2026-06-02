@@ -134,6 +134,9 @@ DEFAULT_SANITIZE_MAP: dict[str, str] = {
     "\u00AE": "(R)",
     "\u00A9": "(C)",
     "\u00B0": " deg ",
+    "\u00BC": "1/4", # one quarter
+    "\u00BD": "1/2", # one half
+    "\u00BE": "3/4", # three quarters
 }
 
 

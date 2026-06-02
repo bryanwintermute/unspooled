@@ -85,6 +85,43 @@ protocol).
      RP332 (a new lesson, OR a section in
      `rongta-rp332-vendor-tool-replacement-recap.md`)
 
+## Running tests locally
+
+The CI runs `python -m pytest tests/` on a fresh runner where
+`pip install pytest` works without ceremony. On a local Debian /
+Ubuntu / Raspberry Pi OS dev box, `pip install pytest` will
+usually fail because of PEP 668 / externally-managed environments.
+
+Pick whichever fits your setup:
+
+```bash
+# Option A: system-installed pytest (recommended for stdlib-only repos).
+#          Works on Debian/Pi/Ubuntu, no venv overhead.
+sudo apt install python3-pytest
+python3 -m pytest tests/
+
+# Option B: project-local venv.
+python3 -m venv .venv               # may need: sudo apt install python3-venv
+.venv/bin/pip install pytest
+.venv/bin/python -m pytest tests/
+
+# Option C: --break-system-packages user install (least clean — avoid
+#           if you already have other tools managing your Python env).
+pip install --user --break-system-packages pytest
+python3 -m pytest tests/
+```
+
+Both `venv/` and `.venv/` are gitignored. `unspooled` has no
+third-party runtime dependencies, so option A is what the
+maintainer uses on day-to-day dev. The test suite should run
+in well under one second.
+
+If you're an agent: if all three options fail and you genuinely
+can't run the test suite, **say so and stop** — do not commit
+"new tests" without verifying they pass. The lesson at
+`~/github/myconfigs/copilot/lessons/antigravity-gemini-as-coding-sidekick.md`
+has the full back-story on why this rule exists.
+
 ## Code style
 
 - **Stdlib only.** Don't add `pip install` dependencies for

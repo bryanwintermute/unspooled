@@ -143,6 +143,13 @@ def test_sanitize_strips_accents_via_nfkd():
     assert sanitize("na\u00EFve") == "naive"
     assert sanitize("r\u00F6le") == "role"
 
+def test_sanitize_translates_fractions():
+    """Sanitizer translates unicode fractions into ASCII equivalents."""
+    from receipt_print import sanitize
+    assert sanitize("1\u00BC cups") == "1 1/4 cups"
+    assert sanitize("\u00BD off") == "1/2 off"
+    assert sanitize("\u00BE inch") == "3/4 inch"
+
 
 def test_default_sanitize_map_is_extendable_via_constant_import():
     """Consumers should be able to import + read DEFAULT_SANITIZE_MAP."""
@@ -151,6 +158,8 @@ def test_default_sanitize_map_is_extendable_via_constant_import():
     assert DEFAULT_SANITIZE_MAP["\u2014"] == "--"
     assert "\u2192" in DEFAULT_SANITIZE_MAP  # arrow
     assert DEFAULT_SANITIZE_MAP["\u2192"] == "->"
+    assert "\u00BD" in DEFAULT_SANITIZE_MAP  # half fraction
+    assert DEFAULT_SANITIZE_MAP["\u00BD"] == "1/2"
 
 
 def test_sanitize_preserves_ascii_unchanged():
